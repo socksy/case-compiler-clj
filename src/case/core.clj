@@ -2,7 +2,13 @@
   (:gen-class))
 
 (defn node [type & args] {:type type, :args (vec args)})
-(def simple (node :case (node :int 1) (node :alternatives (node :alternative (node :int 0) (node :int 1)) (node :alternative (node :int 1) (node :int 0)))))
+;(def simple (node :case (node :int 1) (node :alternatives (node :alternative (node :int 0) (node :int 1)) (node :alternative (node :int 1) (node :int 0)))))
+(def simple (-> (slurp "resources/simple.ast") read-string eval))
+(def input-file simple)
+
+(def types {:cint {:ident 0 :constructors {:int 0 :Integer 1}},
+            :cbool {:ident 1 :constructors {:false 0 :true 1}}
+            })
 
 
 (defn node-type [n] (:type n))
@@ -67,6 +73,18 @@
     (def cnext-stack (list))
     (def first-iter-search true)))
 
+(defn do-loc-edit [loc edit]
+       ;skip first round
+       (if (and (not first-iter-search) 
+                  edit) ;only edit if given edit function 
+         (do 
+             (if-let [edited (edit loc)] 
+               ;return next item with replacement if done, or not otherwise.
+               (cnext (zip/replace loc edited) cnext-stack)
+               (cnext loc cnext-stack)))
+         (do (def first-iter-search false)
+             (cnext loc cnext-stack))))
+
 (defn search 
   ([zipper] (search zipper nil)) 
   ([zipper edit]  
@@ -76,18 +94,7 @@
        (if (zip/end? loc)
          ;(zip/node loc)
          loc
-         (do 
-           (if-let ;have we done an edit?
-             [editedloc 
-              ;skip first round
-              (when (and (not first-iter-search) 
-                         edit) ;only edit if given edit function 
-                (if-let [edited (edit loc)] 
-                  (zip/replace loc edited)))]
-             (do (def first-iter-search false) 
-                 (recur (cnext editedloc cnext-stack)))
-             (do (def first-iter-search false) 
-                 (recur (cnext loc cnext-stack))))))))))
+         (recur (do-loc-edit loc edit)))))))
 
 ;test zipper for post-order traversal
 (def post-order (astzipper (node :top (node :left (node :leftleft) (node :leftright (node :leftrightleft) (node :leftrightright))) (node :right))))
@@ -98,20 +105,40 @@
 (use '[clojure.java.shell :only [sh]])
 (def files '("Int"))
 (map 
-    (fn [file] 
-      (sh "jasmin" (str "./output/" file ".j") "-g" "-d" "./resources/")) 
-    files)
+  (fn [file] 
+    (sh "jasmin" (str "./output/" file ".j") "-g" "-d" "./resources/")) 
+  files)
+
+;TODO change dynamically
+(def stacksize 5)
+(def varsize 6)
+
+;Compile runner program
+(defn spit-code  
+  ([string] (spit-code "output/Runner.j" string))
+  ([f string] (do
+    (spit "output/tmpout" 
+          ;pretty print!
+          (str "\t"
+               (clojure.string/replace string "\n" "\n\t")))
+    ;some shell magic, concats runner around generated code
+    (sh "sh" "-c" (str"sed \"s/___STACKSIZE/" stacksize "/; s/___VARSIZE/\"" varsize "/ output/Runner.j1 | cat - output/tmpout output/Runner.j2 > " f "&& rm output/tmpout")))))
+
 
 ;may break in later versions --- 'clojure.core/import* returns an op code
 ;contrast to (import blah) which is a macro. That was we can pass it the files
 ;(map #('clojure.core/import* %) files) 
- 
+
+
 ;(Main/main nil)
 (def myint (new Int))
-(.run myint)
+('clojure.core/import "Type")
+(new Type)
+(.values (.run myint))
 
 
 (defn -main
   "Main function"
  [& args]
-  (println simple))
+  (
+   (let [syntaxes (map #(-> (slurp %) read eval) args)])))
