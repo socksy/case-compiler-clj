@@ -5,8 +5,18 @@
 (def simple (node :case (node :int 1) (node :alternatives (node :alternative (node :int 0) (node :int 1)) (node :alternative (node :int 1) (node :int 0)))))
 
 
+(defn node-type [n] (:type n))
+
+(defn annotate [n code] (assoc n :code (str code)))
+(defmulti annotatecode node-type)
+(defmethod annotatecode :int [n] (annotate n (str "bipush " (first (:args n)))))
+(defmethod annotatecode :default [n] n)
+
 (defn c-eval-int
-  [node] (do (if (= :int (:type node)) (println (str "int " (first (:args node)))) ()) node))
+  [node] (if (= :int (:type node)) 
+           (assoc node :code 
+                  (str "int " (first (:args node)))) 
+           node))
 
 (defn c-eval-t
   ([type val] (if (= type :int) (c-eval-int val) (println "not recognised"))))
@@ -15,7 +25,7 @@
 (require '[clojure.zip :as zip])
 (defn cbranch? [n] (and (not (= [] (:args n))) (some :type (:args n))))
 (defn cchildren [n] (seq (:args n)))
-(defn cmake-node [n children] (node (:type n) (conj (:args n) children)))
+(defn cmake-node [n children] (node (:type n) children))
 (defn astzipper [n] (zip/zipper cbranch? cchildren cmake-node n))
 (def myzip (astzipper simple))
 
@@ -52,10 +62,6 @@
          (zip/up loc)
          [(zip/node loc) :end])))))
 
-(defn search2 
-  ([zipper] (search2 zipper #(println %)))
-  ([zipper edit]))
-
 (defn reset-search [] 
   (do
     (def cnext-stack (list))
@@ -68,16 +74,25 @@
      (reset-search)
      (loop [loc zipper]
        (if (zip/end? loc)
-         (zip/root loc)
+         ;(zip/node loc)
+         loc
          (do 
-           (when (and (not first-iter-search) edit) (when-let [edited (edit loc)] 
-                        (zip/replace loc edited))) 
-           (def first-iter-search false)
-           (recur (cnext loc cnext-stack))))))))
+           (if-let ;have we done an edit?
+             [editedloc 
+              ;skip first round
+              (when (and (not first-iter-search) 
+                         edit) ;only edit if given edit function 
+                (if-let [edited (edit loc)] 
+                  (zip/replace loc edited)))]
+             (do (def first-iter-search false) 
+                 (recur (cnext editedloc cnext-stack)))
+             (do (def first-iter-search false) 
+                 (recur (cnext loc cnext-stack))))))))))
 
 ;test zipper for post-order traversal
-(def st (astzipper (node :top (node :left (node :leftleft) (node :leftright (node :leftrightleft) (node :leftrightright))) (node :right))))
+(def post-order (astzipper (node :top (node :left (node :leftleft) (node :leftright (node :leftrightleft) (node :leftrightright))) (node :right))))
 
+(search post-order #(println (:type (zip/node %))))
 
 ;Compile jasmin files
 (use '[clojure.java.shell :only [sh]])
