@@ -1,21 +1,38 @@
 (ns case.core
-  (:gen-class))
+  (:gen-class)
+  (:require [clojure.set :refer :all])
+  )
+
+;I hope you have rainbow parantheses on!
 
 (defn node [type & args] {:type type, :args (vec args)})
-;(def simple (node :case (node :int 1) (node :alternatives (node :alternative (node :int 0) (node :int 1)) (node :alternative (node :int 1) (node :int 0)))))
+;(def simple (node :case (node :int 1) (node :alternatives 
+;(node :alternative (node :int 0) (node :int 1)) 
+;(node :alternative (node :int 1) (node :int 0)))))
 (def simple (-> (slurp "resources/simple.ast") read-string eval))
 (def input-file simple)
 
-(def types {:cint {:ident 0 :constructors {:int 0 :Integer 1}},
-            :cbool {:ident 1 :constructors {:false 0 :true 1}}
-            })
+(defn merge-inv-map 
+  [m] (merge m (clojure.set/map-invert m)))
+
+(def types {:cint {:ident 0 :constructors (merge-inv-map {:int 0 :Integer 1})},
+            :cbool {:ident 1 :constructors (merge-inv-map {:false 0 :true 1})},
+            :cstring {:ident 2 :constructors (merge-inv-map {:string 0})},})
 
 
-(defn node-type [n] (:type n))
+(defn node-type "Gets type from node n" [n] (:type n))
+(defn get-code "Gets code from node n" [n] (:code n))
 
-(defn annotate [n code] (assoc n :code (str code)))
+(defn annotate "Annotates node n with code"[n code] (assoc n :code (str code)))
 (defmulti annotatecode node-type)
-(defmethod annotatecode :int [n] (annotate n (str "bipush " (first (:args n)))))
+(defmethod annotatecode :int [n] 
+  (let [number (first (:args n))] 
+    (annotate n (str "bipush " number \
+                     "invokestatic NewType/cint(I)LType;"
+                     ))))
+(defmethod annotatecode :bool [n] ;TODO
+  (let [value (:bool (first (:args n)))])
+  )
 (defmethod annotatecode :default [n] n)
 
 (defn c-eval-int
@@ -35,7 +52,7 @@
 (defn astzipper [n] (zip/zipper cbranch? cchildren cmake-node n))
 (def myzip (astzipper simple))
 
-(defn zip-down [loc] 
+(defn zip-right-down [loc] 
   "Zips to the bottom of the tree from this loc"
   (loop [p loc]
     (if (zip/branch? p)
@@ -44,6 +61,7 @@
       p)))
 
 (defn printstack [stack]
+  "For debugging purposes, prints a stack like cnext-stack."
   (when-not (empty? stack) 
     (loop [st stack]
         (when-not (empty? st) 
@@ -53,6 +71,9 @@
 
 (def cnext-stack (list)) ;visited nodes
 (defn cnext
+  "Case next - the next item in the case tree using post-order
+  traversal. Uses a starting zipper location, and a stack to track
+  previously entered locations."
   ([loc] (cnext loc cnext-stack))
   ([loc stack] 
    (if (= :end (loc 1))
@@ -61,19 +82,23 @@
        ;branch node and visited before?
        (when (and (zip/branch? loc) (nil? (some #(= loc %) stack))) 
          (do (def cnext-stack (cons loc stack))
-             (zip-down loc)))
+             (zip-right-down loc)))
        ;if sibling, go to it and zip down
-       (when (zip/right loc) (-> loc zip/right zip-down)) 
+       (when (zip/right loc) (-> loc zip/right zip-right-down)) 
        (if (zip/up loc)
          (zip/up loc)
          [(zip/node loc) :end])))))
 
 (defn reset-search [] 
+  "Call this to reset state between 'case.core.search calls"
   (do
     (def cnext-stack (list))
     (def first-iter-search true)))
 
-(defn do-loc-edit [loc edit]
+(defn do-loc-edit 
+  "Takes a zipper loc and performs the edit. Returns next item
+  in stack."
+  [loc edit]
        ;skip first round
        (if (and (not first-iter-search) 
                   edit) ;only edit if given edit function 
@@ -86,6 +111,10 @@
              (cnext loc cnext-stack))))
 
 (defn search 
+  "Takes a zipper and optionally an edit function, and does a post-
+  order traversal of the tree the zipper represents. Calls the edit
+  function on each node and replaces the node accordingly in the
+  resulting tree."
   ([zipper] (search zipper nil)) 
   ([zipper edit]  
    (do 
@@ -97,17 +126,22 @@
          (recur (do-loc-edit loc edit)))))))
 
 ;test zipper for post-order traversal
-(def post-order (astzipper (node :top (node :left (node :leftleft) (node :leftright (node :leftrightleft) (node :leftrightright))) (node :right))))
+(def post-order (astzipper (node :top (node :left (node :leftleft)
+   (node :leftright (node :leftrightleft) (node :leftrightright))) (node :right))))
 
-(search post-order #(println (:type (zip/node %))))
+;(search post-order #(println (:type (zip/node %))))
 
 ;Compile jasmin files
 (use '[clojure.java.shell :only [sh]])
-(def files '("Int"))
-(map 
+(def testfiles '("Int.j", "Runner.j"))
+(defn compile-files [files] (map 
   (fn [file] 
-    (sh "jasmin" (str "./output/" file ".j") "-g" "-d" "./resources/")) 
-  files)
+    (sh "jasmin" (str "./output/" file) "-g" "-d" "./resources/")) 
+  files))
+(compile-files testfiles)
+
+(defn tree-to-code "Returns code from the AST ast" [ast] 
+  (get-code (search (ast))))
 
 ;TODO change dynamically
 (def stacksize 5)
@@ -116,13 +150,19 @@
 ;Compile runner program
 (defn spit-code  
   ([string] (spit-code "output/Runner.j" string))
-  ([f string] (do
-    (spit "output/tmpout" 
-          ;pretty print!
-          (str "\t"
-               (clojure.string/replace string "\n" "\n\t")))
-    ;some shell magic, concats runner around generated code
-    (sh "sh" "-c" (str"sed \"s/___STACKSIZE/" stacksize "/; s/___VARSIZE/\"" varsize "/ output/Runner.j1 | cat - output/tmpout output/Runner.j2 > " f "&& rm output/tmpout")))))
+  ([f string] 
+   (let [strrpl clojure.string/replace] 
+     (do
+       (spit "output/tmpout" 
+             ;pretty print!
+             (str "\t" (strrpl string "\n" "\n\t")))
+       ;some shell magic, concats runner around generated code
+       ;also puts in logical values for classname, stacksize etc
+       (let [cclass (strrpl (strrpl f #".*\/" "") ".j" "")] 
+         (sh "sh" "-c" (str "sed \"s/___CLASS/" cclass "/; s/___STACKSIZE/" stacksize "/; s/___VARSIZE/\"" varsize "/ output/Runner.j1 | cat - output/tmpout output/Runner.j2 > " f "&& rm output/tmpout")))))))
+       ;sorry for the unwieldy line --- clojure's (str) fn. automatically 
+       ;puts new line characters if it's broken over different lines 
+
 
 
 ;may break in later versions --- 'clojure.core/import* returns an op code
@@ -141,4 +181,6 @@
   "Main function"
  [& args]
   (
-   (let [syntaxes (map #(-> (slurp %) read eval) args)])))
+   (let [syntaxes (map #(-> (slurp %) read eval) args)]
+      
+     )))
