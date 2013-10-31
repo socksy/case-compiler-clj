@@ -115,11 +115,11 @@
 
 (deftest nested
   (testing "Nested adds"
-    ((is (= (case.core/get-int
+    (is (= (case.core/get-int
              (run-for-test 8 1
                            (node :add (node :add (node :int 1) (node :int 2)) (node :int 2))) )
            5))
      (is (= (case.core/get-int
              (run-for-test 8 2 
                            (node :add (node :add (node :int 1) (node :int 2)) (node :add (node :int 5) (node :int 1)))) )
-           9)))))
+           9))))

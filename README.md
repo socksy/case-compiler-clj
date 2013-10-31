@@ -1,36 +1,31 @@
 # case
+A compiler written in clojure for the JVM.
 
-FIXME: description
-
-## Installation
-
-Download from http://example.com/FIXME.
 
 ## Usage
 
-FIXME: explanation
+    $ java -jar case-0.1.0-standalone.jar ./resources/simple.ast
 
-    $ java -jar case-0.1.0-standalone.jar [args]
 
-## Options
+### Implementation
+	
+####Abstract Syntax Tree
+The abstract syntax tree was represented in clojure with the use of maps, from symbols as keywords to attributes --- which could include other nodes (hence making a tree.
 
-FIXME: listing of options this app accepts.
+This was wrapped with a creator in a "node" function, which meant that the tree could be represented in s-expressions. These went a bit like this:
 
-## Examples
+		(node :add (node :int 2) (node :int 2))
 
-...
+The second argument is the :type symbol, and any other arguments are added to the list of values stored under :args.
 
-### Bugs
+This format was chosen due to being easy for a human to read, easy for a computer to read (they're s-expressions). Also, this would allow support for different data constructor to the type name - so I could have a (node :either :left a), for example.
 
-...
+#####Annotations
+The tree was traversed with the aid of a functional zipper. As it went through the tree, it would run a multimethod against each node to see how to append a :code value, which would generally require knowledge of the below nodes. The final :code annotation at the top of the tree was used inbetween some runner jasmin code.
 
-### Any Other Sections
-### That You Think
-### Might be Useful
+####Compilations
+The code is compiled with shell access to jasmin (which needs to be installed and in the path for the program to run). Any data types were boxed 
 
-## License
+#Resources
+http://www.ibm.com/developerworks/library/j-treevisit/
 
-Copyright © 2013 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.

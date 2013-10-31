@@ -1,0 +1,45 @@
+
+lein test case.core-test
+{:exit 0, :out Generated: ./resources/NestedAddsTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/NestedAddsTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/DivTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/DivTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/AndTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/AndTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/MinusTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/MinusTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/BoolTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/BoolTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/MultTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/MultTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/OrTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/OrTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/OrTest3.class
+, :err }
+{:exit 0, :out Generated: ./resources/IntTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/IntTest2.class
+, :err }
+{:exit 0, :out Generated: ./resources/IntTest3.class
+, :err }
+{:exit 0, :out Generated: ./resources/AddTest1.class
+, :err }
+{:exit 0, :out Generated: ./resources/AddTest2.class
+, :err }
+
+Ran 9 tests containing 20 assertions.
+0 failures, 0 errors.

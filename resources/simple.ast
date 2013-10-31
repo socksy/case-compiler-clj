@@ -1,2 +1,2 @@
-(node :case (node :int 1) (node :alternatives (node :alternative (node :int 0) (node :int 1)) (node :alternative (node :int 1) (node :int 0))))
-
+(use 'case.core)
+(node :div (node :add (node :int 5) (node :int 10)) (node :div (node :int 6) (node :int 2)))

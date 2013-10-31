@@ -75,8 +75,7 @@
                      "invokevirtual java/lang/Integer.intValue()I"\
                      opstring\
                      opreturn\
-                     ))) 
-  )
+                     ))))
 
 (defmethod annotatecode :and [n]
   (load-2-vars-and-do n "iand" "invokestatic NewType/cbool(I)LType;"))
@@ -245,16 +244,18 @@
 
 
 ;(Main/main nil)
-(def myint (new Int))
-('clojure.core/import "Type")
-(new Type)
-(.values (.run myint))
+;(def myint (new Int))
+;('clojure.core/import "Type")
+;(new Type)
+;(.values (.run myint))
 
 
 (defn -main
   "Main function"
  [& args]
-  (
    (let [syntaxes (map #(-> (slurp %) read eval) args)]
-      
-     )))
+      (let [zipped (map vector args syntaxes)]
+        (loop [zippy zipped]
+          (when (not (nil? zippy)) 
+            (do (apply run (first zippy))
+                (recur (rest (zippy)))))))))
