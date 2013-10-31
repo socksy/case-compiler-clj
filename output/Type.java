@@ -23,6 +23,13 @@ public class Type {
 		return tmp;
 	}
 
+	public boolean match (Type t) {
+		if (t.ident == this.ident && t.constructorType = this.constructorType)
+			return true;
+		else 
+			return false;
+	}
+
 	public void printTypes() {
 		for (Object o : values) {
 			System.out.println(o.toString());

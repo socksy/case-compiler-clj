@@ -197,7 +197,7 @@
   (-> (search (astzipper ast) #(annotatecode (zip/node %)))
       zip/node get-code))
 
-;TODO change dynamically
+;fairly arbitrary
 (def stacksize 100)
 (def varsize 10)
 
