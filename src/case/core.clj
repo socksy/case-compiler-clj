@@ -5,6 +5,19 @@
 
 ;I hope you have rainbow parantheses on!
 
+;some quick clojure notes:
+;   To get an item from a map, (:key {:key :value}) is used,
+;where the colon syntax represents a symbol. It is also a function
+;when used to get an item from a list.
+;   #(something %) is shorthand for a an anonymous function, where % is
+;the parameter passed to it.
+;   -> feeds through to the second operator of the next command
+;so that (-> a b c d) === (d (c (b a)))
+;   You probably know what a zipper is, but otherwise it's just
+;an easy way to navigate around a tree
+;   defmulti defines a multiple dispatch situation, dispatching to the
+;correct method depending on the function given
+
 (defn node [type & args] {:type type, :args (vec args)})
 ;(def simple (node :case (node :int 1) (node :alternatives 
 ;(node :alternative (node :int 0) (node :int 1)) 
@@ -44,13 +57,12 @@
 (defn c-eval-t
   ([type val] (if (= type :int) (c-eval-int val) (println "not recognised"))))
 
-;zipping
+;making a zipper for my AST type
 (require '[clojure.zip :as zip])
 (defn cbranch? [n] (and (not (= [] (:args n))) (some :type (:args n))))
 (defn cchildren [n] (seq (:args n)))
 (defn cmake-node [n children] (node (:type n) children))
 (defn astzipper [n] (zip/zipper cbranch? cchildren cmake-node n))
-(def myzip (astzipper simple))
 
 (defn zip-right-down [loc] 
   "Zips to the bottom of the tree from this loc"
@@ -141,7 +153,7 @@
 (compile-files testfiles)
 
 (defn tree-to-code "Returns code from the AST ast" [ast] 
-  (get-code (search (ast))))
+  (-> ast astzipper search zip/node get-code))
 
 ;TODO change dynamically
 (def stacksize 5)
