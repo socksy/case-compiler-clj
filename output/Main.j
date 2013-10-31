@@ -7,7 +7,7 @@
 	return
 .end method
 
-.method public static main([Ljava/lang/String;)V
+.method public main()LType;
 	.limit stack 5
 	getstatic      java/lang/System/out Ljava/io/PrintStream;
 	;ldc            "Hello World."

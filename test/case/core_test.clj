@@ -3,5 +3,8 @@
             [case.core :refer :all]))
 
 (deftest a-test
-  (testing "FIXME, I fail."
-    (is (= 0 1))))
+  (testing "Plain int"
+    (is (= (case.core/get-int 
+             (case.core/run "IntTest" 
+               (case.core/node :int 5)))
+           5))))

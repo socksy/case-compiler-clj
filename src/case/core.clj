@@ -15,7 +15,7 @@
 ;so that (-> a b c d) === (d (c (b a)))
 ;   You probably know what a zipper is, but otherwise it's just
 ;an easy way to navigate around a tree
-;   defmulti defines a multiple dispatch situation, dispatching to the
+;   defmulti defines a multimethod (using multiple dispatch), dispatching to the
 ;correct method depending on the function given
 
 (defn node [type & args] {:type type, :args (vec args)})
@@ -34,13 +34,13 @@
 
 
 (defn node-type "Gets type from node n" [n] (:type n))
-(defn get-code "Gets code from node n" [n] (:code n))
+(defn get-code "Gets code from node n" [n] (when-let [code (:code n)] code))
 
 (defn annotate "Annotates node n with code"[n code] (assoc n :code (str code)))
 (defmulti annotatecode node-type)
 (defmethod annotatecode :int [n] 
   (let [number (first (:args n))] 
-    (annotate n (str "bipush " number \
+    (annotate n (str "ldc " number \
                      "invokestatic NewType/cint(I)LType;"
                      ))))
 (defmethod annotatecode :bool [n] ;TODO
@@ -111,16 +111,18 @@
   "Takes a zipper loc and performs the edit. Returns next item
   in stack."
   [loc edit]
-       ;skip first round
-       (if (and (not first-iter-search) 
-                  edit) ;only edit if given edit function 
-         (do 
-             (if-let [edited (edit loc)] 
-               ;return next item with replacement if done, or not otherwise.
-               (cnext (zip/replace loc edited) cnext-stack)
-               (cnext loc cnext-stack)))
-         (do (def first-iter-search false)
-             (cnext loc cnext-stack))))
+  ;skip first round unless it's a leaf (so tree of one)
+  (if (and 
+        (or (not (zip/branch? loc))
+            (not first-iter-search)) 
+        edit) ;only edit if given edit function 
+    (do 
+      (if-let [edited (edit loc)] 
+        ;return next item with replacement if done, or not otherwise.
+        (cnext (zip/replace loc edited) cnext-stack)
+        (cnext loc cnext-stack)))
+    (do (def first-iter-search false)
+        (cnext loc cnext-stack))))
 
 (defn search 
   "Takes a zipper and optionally an edit function, and does a post-
@@ -153,7 +155,8 @@
 (compile-files testfiles)
 
 (defn tree-to-code "Returns code from the AST ast" [ast] 
-  (-> ast astzipper search zip/node get-code))
+  (-> (search (astzipper ast) #(annotatecode (zip/node %)))
+      zip/node get-code))
 
 ;TODO change dynamically
 (def stacksize 5)
@@ -161,6 +164,8 @@
 
 ;Compile runner program
 (defn spit-code  
+  "Given an (optional) filename and string, this writes out the string as 
+  Jasmin code."
   ([string] (spit-code "output/Runner.j" string))
   ([f string] 
    (let [strrpl clojure.string/replace] 
@@ -173,9 +178,19 @@
        (let [cclass (strrpl (strrpl f #".*\/" "") ".j" "")] 
          (sh "sh" "-c" (str "sed \"s/___CLASS/" cclass "/; s/___STACKSIZE/" stacksize "/; s/___VARSIZE/\"" varsize "/ output/Runner.j1 | cat - output/tmpout output/Runner.j2 > " f "&& rm output/tmpout")))))))
        ;sorry for the unwieldy line --- clojure's (str) fn. automatically 
-       ;puts new line characters if it's broken over different lines 
+       ;puts new line characters if it's broken over multiple lines 
 
+(defn get-int "Unboxes array type for testing" [ctype] 
+  ;this is java interop, basically doing ctype.values[0]
+  (aget (.values ctype) 0))
 
+(defn run
+  [runname tree]
+  (do (spit-code (str "output/" runname ".j") (tree-to-code tree))
+      (Thread/sleep 100)
+      (println (compile-files [(str runname ".j")]))
+      (Thread/sleep 100)
+      (.run (eval (read-string (str "(new " runname ")"))))))
 
 ;may break in later versions --- 'clojure.core/import* returns an op code
 ;contrast to (import blah) which is a macro. That was we can pass it the files

@@ -1,4 +1,4 @@
-.class public Main
+.class public ___CLASS
 .super java/lang/Object
 
 .method public <init>()V
@@ -7,7 +7,7 @@
 	return
 .end method
 
-.method public main()LType;
+.method public run()LType;
 	.limit stack ___STACKSIZE
-	.limit variables ___VARSIZE
+	.limit locals ___VARSIZE
 

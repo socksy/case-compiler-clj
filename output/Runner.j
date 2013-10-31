@@ -1,4 +1,4 @@
-.class public Main
+.class public Runner
 .super java/lang/Object
 
 .method public <init>()V
@@ -7,10 +7,9 @@
 	return
 .end method
 
-.method public main()LType;
+.method public static main([Ljava/lang/String;)V
 	.limit stack 5
-	.limit variables 6
 
-	honest to god this works
-	areturn
+	ldc "a"
+	return
 .end method

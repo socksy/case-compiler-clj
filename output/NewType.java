@@ -1,5 +1,5 @@
 public class NewType {
-	public Type cint (int integer) {
+	public static Type cint (int integer) {
 		Type cint = new Type();
 		cint.ident = 0;
 		cint.constructorType = 0;
@@ -7,11 +7,11 @@ public class NewType {
 		return cint;
 	}
 
-	public Type cbool (boolean bool) {
+	public static Type cbool (int bool) {
 		Type cbool = new Type();
 		cbool.ident = 1;
-		cbool.constructorType = bool ? 1 : 0;
-		cbool.values = new Object[0];
+		cbool.constructorType = bool;
+		cbool.values = new Object[] {(Object) new Integer(bool)};
 		return cbool;
 	}
 }
