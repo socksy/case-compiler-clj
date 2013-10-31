@@ -18,7 +18,7 @@
 ;   defmulti defines a multimethod (using multiple dispatch), dispatching to the
 ;correct method depending on the function given
 
-(defn node [type & args] {:type type, :args (vec args)})
+(defn node [type & args] {:type type, :args args})
 ;(def simple (node :case (node :int 1) (node :alternatives 
 ;(node :alternative (node :int 0) (node :int 1)) 
 ;(node :alternative (node :int 1) (node :int 0)))))
@@ -37,31 +37,72 @@
 (defn get-code "Gets code from node n" [n] (when-let [code (:code n)] code))
 
 (defn annotate "Annotates node n with code"[n code] (assoc n :code (str code)))
+
 (defmulti annotatecode node-type)
 (defmethod annotatecode :int [n] 
   (let [number (first (:args n))] 
     (annotate n (str "ldc " number \
-                     "invokestatic NewType/cint(I)LType;"
-                     ))))
+                     "invokestatic NewType/cint(I)LType;"))))
+
 (defmethod annotatecode :bool [n] ;TODO
-  (let [value (:bool (first (:args n)))])
+  (let [value (first (:args n))]
+    (case value
+      :true (annotate n (str "iconst_1"\
+                             "invokestatic NewType/cbool(I)LType;"))
+      :false (annotate n (str "iconst_0"\
+                             "invokestatic NewType/cbool(I)LType;"))
+      "default" (println (str "Bools should be :true or :false, not " value)))))
+
+(defmethod annotatecode :string [n]
+  (let [string (first (:args n))] 
+    (annotate n (str "ldc \"" string "\""
+                     "invokestatic NewType/cstring(S)LType;"))))
+
+(defn load-2-vars-and-do [n opstring opreturn]
+  (let [left (:code (first (:args n))), right (:code (first (rest (:args n))))]
+    (annotate n (str 
+                     left \
+                     "getfield Type/values [Ljava/lang/Object;"\
+                     "iconst_0" \
+                     "aaload" \
+                     "checkcast java/lang/Integer" \
+                     "invokevirtual java/lang/Integer.intValue()I"\
+                     right\
+                     "getfield Type/values [Ljava/lang/Object;"\
+                     "iconst_0" \
+                     "aaload" \
+                     "checkcast java/lang/Integer" \
+                     "invokevirtual java/lang/Integer.intValue()I"\
+                     opstring\
+                     opreturn\
+                     ))) 
   )
+
+(defmethod annotatecode :and [n]
+  (load-2-vars-and-do n "iand" "invokestatic NewType/cbool(I)LType;"))
+
+(defmethod annotatecode :or [n]
+  (load-2-vars-and-do n "ior" "invokestatic NewType/cbool(I)LType;"))
+
+(defmethod annotatecode :add [n]
+  (load-2-vars-and-do n "iadd" "invokestatic NewType/cint(I)LType;") )
+
+(defmethod annotatecode :minus [n]
+  (load-2-vars-and-do n "isub" "invokestatic NewType/cint(I)LType;") )
+
+(defmethod annotatecode :mult [n]
+  (load-2-vars-and-do n "imul" "invokestatic NewType/cint(I)LType;") )
+
+(defmethod annotatecode :div [n]
+  (load-2-vars-and-do n "idiv" "invokestatic NewType/cint(I)LType;") )
+
 (defmethod annotatecode :default [n] n)
-
-(defn c-eval-int
-  [node] (if (= :int (:type node)) 
-           (assoc node :code 
-                  (str "int " (first (:args node)))) 
-           node))
-
-(defn c-eval-t
-  ([type val] (if (= type :int) (c-eval-int val) (println "not recognised"))))
 
 ;making a zipper for my AST type
 (require '[clojure.zip :as zip])
 (defn cbranch? [n] (and (not (= [] (:args n))) (some :type (:args n))))
 (defn cchildren [n] (seq (:args n)))
-(defn cmake-node [n children] (node (:type n) children))
+(defn cmake-node [n children] (apply node (:type n) children))
 (defn astzipper [n] (zip/zipper cbranch? cchildren cmake-node n))
 
 (defn zip-right-down [loc] 
@@ -148,19 +189,18 @@
 ;Compile jasmin files
 (use '[clojure.java.shell :only [sh]])
 (def testfiles '("Int.j", "Runner.j"))
-(defn compile-files [files] (map 
-  (fn [file] 
-    (sh "jasmin" (str "./output/" file) "-g" "-d" "./resources/")) 
-  files))
-(compile-files testfiles)
+(defn compile-file 
+  [file] 
+    (sh "jasmin" (str "./output/" file) "-g" "-d" "./resources/") )
+(compile-file testfiles)
 
 (defn tree-to-code "Returns code from the AST ast" [ast] 
   (-> (search (astzipper ast) #(annotatecode (zip/node %)))
       zip/node get-code))
 
 ;TODO change dynamically
-(def stacksize 5)
-(def varsize 6)
+(def stacksize 100)
+(def varsize 10)
 
 ;Compile runner program
 (defn spit-code  
@@ -180,17 +220,24 @@
        ;sorry for the unwieldy line --- clojure's (str) fn. automatically 
        ;puts new line characters if it's broken over multiple lines 
 
-(defn get-int "Unboxes array type for testing" [ctype] 
+(defn get-bool "Unboxes array type to bool for testing" [ctype]
+  (if (= 1 (aget (.values ctype) 0)) true false))
+
+(defn get-int "Unboxes array type to int for testing" [ctype] 
   ;this is java interop, basically doing ctype.values[0]
   (aget (.values ctype) 0))
 
 (defn run
   [runname tree]
   (do (spit-code (str "output/" runname ".j") (tree-to-code tree))
-      (Thread/sleep 100)
-      (println (compile-files [(str runname ".j")]))
-      (Thread/sleep 100)
+      (println (compile-file (str runname ".j")))
       (.run (eval (read-string (str "(new " runname ")"))))))
+
+(defn clean [runname]
+  (do 
+    (println "cleaning")
+    (println (sh "ls"))
+    (sh "sh" "-c" (str "rm ./resources/" runname "* ./output/" runname "*"))))
 
 ;may break in later versions --- 'clojure.core/import* returns an op code
 ;contrast to (import blah) which is a macro. That was we can pass it the files

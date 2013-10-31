@@ -14,4 +14,12 @@ public class NewType {
 		cbool.values = new Object[] {(Object) new Integer(bool)};
 		return cbool;
 	}
+
+	public static Type cstring(String string) {
+		Type cstring = new Type();
+		cstring.ident = 2;
+		cstring.constructorType = 0;
+		cstring.values = new Object[] {(Object) string};
+		return cstring;
+	}
 }
